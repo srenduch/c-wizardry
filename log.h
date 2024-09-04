@@ -37,7 +37,7 @@
         log_enqueue(log); \
     } while (0)
 
-#define LOG_ERR(fmt, ...) \
+#define LOG_NONFATAL(fmt, ...) \
     do \
     { \
         struct log log; \
@@ -53,7 +53,7 @@
 #define LOG_FATAL(fmt, ...) \
     do \
     { \
-        LOG_ERR("FATAL ERROR: "fmt, ##__VA_ARGS__); \
+        LOG_NONFATAL("FATAL ERROR: "fmt, ##__VA_ARGS__); \
         raise(SIG_LOG_FATAL); \
     } while (0)
 #endif /* LOGGING_ENABLED */

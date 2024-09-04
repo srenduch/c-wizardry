@@ -64,6 +64,24 @@ _destroy_logger
     int sig
 );
 
+static void
+handle_log_state_active
+(
+    void
+);
+
+static void
+handle_log_state_destroy
+(
+    void
+);
+
+static void
+handle_log_state_fatal
+(
+    void
+);
+
 void
 log_enqueue
 (
@@ -114,6 +132,51 @@ log_dequeue
     return log;
 }
 
+static void
+handle_log_state_active
+(
+    void
+)
+{
+    struct log* log;
+
+    while (!state.size && state.active == LOG_STATE_ACTIVE)
+        continue;
+
+    log = log_dequeue();
+    if (log)
+        fprintf(log->stream, "%s", log->msg);
+}
+
+static void
+handle_log_state_destroy
+(
+    void
+)
+{
+    struct log* log;
+
+    while (state.size && (log = log_dequeue()))
+        fprintf(log->stream, "%s", log->msg);
+
+    pthread_mutex_destroy(&state_sync_mutex);
+    free(queue);
+    pthread_exit(NULL);
+}
+
+static void
+handle_log_state_fatal
+(
+    void
+)
+{
+    struct log* log;
+
+    while(state.size && (log = log_dequeue()))
+        fprintf(log->stream, "%s", log->msg);
+    pthread_exit(NULL);
+}
+
 static void*
 log_message
 (
@@ -124,31 +187,19 @@ log_message
 
     while (true)
     {
-        struct log* log;
-
-        if (state.active == LOG_STATE_ACTIVE)
+        switch (state.active)
         {
-            if (!state.size)
-                continue;
-
-            log = log_dequeue();
-            if (log)
-                fprintf(log->stream, "%s", log->msg);
-        }
-        else if (state.active == LOG_STATE_DESTROY)
-        {
-            while (state.size && (log = log_dequeue()))
-                fprintf(log->stream, "%s", log->msg);
-
-            pthread_mutex_destroy(&state_sync_mutex);
-            free(queue);
-            break;
-        }
-        else if (state.active == LOG_STATE_FATAL)
-        {
-            while (state.size && (log = log_dequeue()))
-                fprintf(log->stream, "%s", log->msg);
-            pthread_exit(NULL);
+            case LOG_STATE_ACTIVE:
+                handle_log_state_active();
+                break;
+            case LOG_STATE_DESTROY:
+                handle_log_state_destroy();
+                break;
+            case LOG_STATE_FATAL:
+                handle_log_state_fatal();
+                break;
+            default:
+                LOG_FATAL("Invalid log state %u", state.active);
         }
     }
 
